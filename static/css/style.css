@@ -1,0 +1,66 @@
+/* Custom styling to complement the Bootstrap theme */
+
+.code-block {
+    background-color: var(--bs-dark);
+    color: var(--bs-light);
+    padding: 1rem;
+    border-radius: 0.375rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+}
+
+pre.code-block {
+    margin-bottom: 1rem;
+    max-height: 400px;
+}
+
+.card {
+    margin-bottom: 1.5rem;
+}
+
+/* Styling for documentation page */
+section {
+    margin-bottom: 2rem;
+}
+
+/* Custom card with better contrast */
+.card {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    pre.code-block {
+        font-size: 0.85rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Scrollbar styling for code blocks */
+pre.code-block::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+pre.code-block::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+pre.code-block::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+}
+
+pre.code-block::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.4);
+}

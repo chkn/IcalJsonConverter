@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation - iCal to JSON Converter</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">iCal to JSON API</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/documentation">Documentation</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h1 class="card-title">API Documentation</h1>
+                    </div>
+                    <div class="card-body">
+                        <section id="overview" class="mb-5">
+                            <h2>Overview</h2>
+                            <p>
+                                The iCal to JSON Converter API allows you to convert iCal (ICS) calendar feeds into a 
+                                structured JSON format. This API fetches iCal data from a specified URL, parses it, and 
+                                returns it in a consistent JSON structure that is easy to work with in any application.
+                            </p>
+                        </section>
+
+                        <section id="endpoints" class="mb-5">
+                            <h2>Endpoints</h2>
+                            
+                            <div class="card mb-4">
+                                <div class="card-header">
+                                    <h3 class="h5 mb-0">Convert iCal to JSON</h3>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>URL:</strong> <code>/api/convert</code></p>
+                                    <p><strong>Method:</strong> GET</p>
+                                    
+                                    <h4>Query Parameters</h4>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Parameter</th>
+                                                <th>Type</th>
+                                                <th>Required</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>url</td>
+                                                <td>string</td>
+                                                <td>Yes</td>
+                                                <td>The URL of the iCal feed to convert</td>
+                                            </tr>
+                                            <tr>
+                                                <td>timeout</td>
+                                                <td>integer</td>
+                                                <td>No</td>
+                                                <td>Request timeout in seconds (default: 10, max: 60)</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    
+                                    <h4>Example Request</h4>
+                                    <pre class="code-block">GET /api/convert?url=https://example.com/calendar.ics&timeout=15</pre>
+                                    
+                                    <h4>Success Response (200 OK)</h4>
+                                    <pre class="code-block">
+{
+  "calendar": {
+    "name": "My Calendar",
+    "description": "My personal calendar",
+    "timezone": "America/New_York"
+  },
+  "events": [
+    {
+      "uid": "event-123@example.com",
+      "summary": "Team Meeting",
+      "description": "Weekly team meeting",
+      "location": "Conference Room A",
+      "status": "CONFIRMED",
+      "organizer": {
+        "value": "mailto:organizer@example.com",
+        "common_name": "John Doe"
+      },
+      "start": {
+        "datetime": "2023-05-10T10:00:00-04:00",
+        "value_type": "DATE-TIME",
+        "timezone": "America/New_York"
+      },
+      "end": {
+        "datetime": "2023-05-10T11:00:00-04:00",
+        "value_type": "DATE-TIME",
+        "timezone": "America/New_York"
+      },
+      "created": "2023-05-01T12:00:00Z",
+      "last_modified": "2023-05-01T12:00:00Z",
+      "recurrence": {
+        "FREQ": "WEEKLY",
+        "BYDAY": ["MO"]
+      }
+    }
+  ],
+  "event_count": 1
+}
+</pre>
+
+                                    <h4>Error Responses</h4>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Status</th>
+                                                <th>Description</th>
+                                                <th>Example</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>400 Bad Request</td>
+                                                <td>Invalid or missing parameters</td>
+                                                <td><pre class="code-block">{"error": "Missing required parameter: url"}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>400 Bad Request</td>
+                                                <td>Invalid URL format</td>
+                                                <td><pre class="code-block">{"error": "Invalid URL format. URL must include scheme (http/https) and domain."}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>400 Bad Request</td>
+                                                <td>Malformed iCal data</td>
+                                                <td><pre class="code-block">{"error": "Failed to parse iCal data: Invalid iCal format"}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>404 Not Found</td>
+                                                <td>iCal feed URL not found</td>
+                                                <td><pre class="code-block">{"error": "Failed to fetch iCal feed. HTTP Status: 404"}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>408 Request Timeout</td>
+                                                <td>Request timed out</td>
+                                                <td><pre class="code-block">{"error": "Request timed out after 10 seconds"}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>500 Internal Server Error</td>
+                                                <td>Server error</td>
+                                                <td><pre class="code-block">{"error": "Internal server error"}</pre></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="response-format" class="mb-5">
+                            <h2>Response Format</h2>
+                            
+                            <h3>Calendar Object</h3>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>name</td>
+                                        <td>string</td>
+                                        <td>Calendar name (X-WR-CALNAME)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>description</td>
+                                        <td>string</td>
+                                        <td>Calendar description (X-WR-CALDESC)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>timezone</td>
+                                        <td>string</td>
+                                        <td>Calendar timezone (X-WR-TIMEZONE)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            
+                            <h3>Event Object</h3>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>uid</td>
+                                        <td>string</td>
+                                        <td>Unique identifier for the event</td>
+                                    </tr>
+                                    <tr>
+                                        <td>summary</td>
+                                        <td>string</td>
+                                        <td>Event title/summary</td>
+                                    </tr>
+                                    <tr>
+                                        <td>description</td>
+                                        <td>string</td>
+                                        <td>Event description</td>
+                                    </tr>
+                                    <tr>
+                                        <td>location</td>
+                                        <td>string</td>
+                                        <td>Event location</td>
+                                    </tr>
+                                    <tr>
+                                        <td>status</td>
+                                        <td>string</td>
+                                        <td>Event status (e.g., CONFIRMED, TENTATIVE, CANCELLED)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>organizer</td>
+                                        <td>object/string</td>
+                                        <td>Event organizer information</td>
+                                    </tr>
+                                    <tr>
+                                        <td>created</td>
+                                        <td>string</td>
+                                        <td>Event creation timestamp (ISO format)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>last_modified</td>
+                                        <td>string</td>
+                                        <td>Event last modification timestamp (ISO format)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>start</td>
+                                        <td>object</td>
+                                        <td>Event start time information</td>
+                                    </tr>
+                                    <tr>
+                                        <td>end</td>
+                                        <td>object</td>
+                                        <td>Event end time information</td>
+                                    </tr>
+                                    <tr>
+                                        <td>recurrence</td>
+                                        <td>object</td>
+                                        <td>Event recurrence rules (if applicable)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>alarms</td>
+                                        <td>array</td>
+                                        <td>Event reminders/alarms (if applicable)</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </section>
+
+                        <section id="examples" class="mb-5">
+                            <h2>Examples</h2>
+                            
+                            <h3>Example 1: Basic Usage</h3>
+                            <p>Convert a public iCal feed to JSON:</p>
+                            <pre class="code-block">GET /api/convert?url=https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics</pre>
+                            
+                            <h3>Example 2: With Custom Timeout</h3>
+                            <p>Convert an iCal feed with a 30-second timeout:</p>
+                            <pre class="code-block">GET /api/convert?url=https://example.com/large-calendar.ics&timeout=30</pre>
+                            
+                            <h3>Example 3: cURL Command</h3>
+                            <pre class="code-block">curl -X GET "https://your-api-domain.com/api/convert?url=https://example.com/calendar.ics"</pre>
+                            
+                            <h3>Example 4: JavaScript Fetch</h3>
+                            <pre class="code-block">
+fetch('/api/convert?url=' + encodeURIComponent('https://example.com/calendar.ics'))
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));
+</pre>
+                        </section>
+
+                        <section id="limitations" class="mb-5">
+                            <h2>Limitations</h2>
+                            <ul class="list-group">
+                                <li class="list-group-item">Maximum timeout is 60 seconds</li>
+                                <li class="list-group-item">Only publicly accessible iCal feeds are supported</li>
+                                <li class="list-group-item">The API does not cache results - each request fetches fresh data from the URL</li>
+                                <li class="list-group-item">Only HTTP and HTTPS URLs are supported</li>
+                            </ul>
+                        </section>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="mt-5 py-3 bg-dark">
+        <div class="container text-center">
+            <p class="text-muted mb-0">iCal to JSON Converter API</p>
+        </div>
+    </footer>
+</body>
+</html>
