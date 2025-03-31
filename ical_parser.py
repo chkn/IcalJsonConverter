@@ -75,10 +75,9 @@ def fetch_and_parse_ical(url, timeout=10):
                 'timezone': str(calendar.get('X-WR-TIMEZONE', 'UTC')),
             }
             
-            # Initialize events list
-            events = []
+            # First pass: collect all events with their properties
+            events_by_uid = {}
             
-            # Process each event in the calendar
             for component in calendar.walk():
                 if component.name == "VEVENT":
                     event = {
@@ -90,17 +89,35 @@ def fetch_and_parse_ical(url, timeout=10):
                         'organizer': _parse_organizer(component.get('ORGANIZER', '')),
                         'created': _format_datetime(component.get('CREATED', None)),
                         'last_modified': _format_datetime(component.get('LAST-MODIFIED', None)),
+                        'related_to': str(component.get('RELATED-TO', '')),
+                        'relationship_type': str(component.get('RELTYPE', '')),
+                        'subevents': []  # Will store child events
                     }
+                    
+                    # Extract RELATED-TO parameter if it exists (this may indicate a parent-child relationship)
+                    related_to = component.get('RELATED-TO', None)
+                    if related_to:
+                        event['related_to'] = str(related_to)
+                        # Get relationship type if available
+                        if hasattr(related_to, 'params') and 'RELTYPE' in related_to.params:
+                            event['relationship_type'] = str(related_to.params['RELTYPE'])
+                    
+                    # Handle any custom 'parent_uid' property that might be in the feed
+                    parent_uid = component.get('X-PARENT-UID', component.get('PARENT-UID', None))
+                    if parent_uid:
+                        event['parent_uid'] = str(parent_uid)
                     
                     # Handle start time
                     dtstart = component.get('DTSTART', None)
                     if dtstart:
                         event['start'] = _parse_datetime(dtstart)
+                        event['start_dt'] = dtstart.dt  # Store actual datetime for comparison
                     
                     # Handle end time
                     dtend = component.get('DTEND', None)
                     if dtend:
                         event['end'] = _parse_datetime(dtend)
+                        event['end_dt'] = dtend.dt  # Store actual datetime for comparison
                     
                     # Handle recurrence rule
                     rrule = component.get('RRULE', None)
@@ -120,13 +137,96 @@ def fetch_and_parse_ical(url, timeout=10):
                     if alarms:
                         event['alarms'] = alarms
                     
-                    events.append(event)
+                    # Store event by UID for later reference
+                    events_by_uid[event['uid']] = event
+            
+            # Second pass: identify parent-child relationships and organize events
+            organized_events = []
+            processed_uids = set()  # Track which events have been processed
+            
+            # First check for explicit parent-child relationships via RELATED-TO or similar properties
+            for uid, event in events_by_uid.items():
+                # Skip if already processed as a child
+                if uid in processed_uids:
+                    continue
+                
+                # If this event is related to another event, it might be a child
+                if 'related_to' in event and event['related_to'] and event['related_to'] in events_by_uid:
+                    parent_event = events_by_uid[event['related_to']]
+                    parent_event['subevents'].append(event)
+                    processed_uids.add(uid)
+                    continue
+                
+                # If this event has an explicit parent_uid property
+                if 'parent_uid' in event and event['parent_uid'] and event['parent_uid'] in events_by_uid:
+                    parent_event = events_by_uid[event['parent_uid']]
+                    parent_event['subevents'].append(event)
+                    processed_uids.add(uid)
+                    continue
+            
+            # Then try to infer parent-child relationships based on time containment
+            for uid, event in events_by_uid.items():
+                # Skip if already processed as a child
+                if uid in processed_uids:
+                    continue
+                
+                # Check if this event's time range contains other events
+                if 'start_dt' in event and 'end_dt' in event:
+                    for other_uid, other_event in events_by_uid.items():
+                        if uid == other_uid or other_uid in processed_uids:
+                            continue
+                        
+                        # Check if other event is within this event's time range
+                        if ('start_dt' in other_event and 'end_dt' in other_event and
+                            event['start_dt'] <= other_event['start_dt'] and 
+                            event['end_dt'] >= other_event['end_dt']):
+                            
+                            # If the time ranges match exactly, compare summary/title length
+                            # Longer titles often indicate more specific subevents
+                            if (event['start_dt'] == other_event['start_dt'] and 
+                                event['end_dt'] == other_event['end_dt']):
+                                if len(other_event['summary']) > len(event['summary']):
+                                    # Skip containment for equal time ranges with longer summary
+                                    continue
+                            
+                            # Add this event as a subevent
+                            event['subevents'].append(other_event)
+                            processed_uids.add(other_uid)
+            
+            # Prepare the final event list, keeping only top-level events
+            for uid, event in events_by_uid.items():
+                if uid not in processed_uids:
+                    # Clean up temporary attributes before adding to the final list
+                    event.pop('start_dt', None)
+                    event.pop('end_dt', None)
+                    
+                    # Remove empty properties for cleaner output
+                    if not event['related_to']:
+                        event.pop('related_to', None)
+                    if not event['relationship_type']:
+                        event.pop('relationship_type', None)
+                    if not event['subevents']:
+                        event.pop('subevents', None)
+                    
+                    # Clean up subevents too
+                    if 'subevents' in event:
+                        for subevent in event['subevents']:
+                            subevent.pop('start_dt', None)
+                            subevent.pop('end_dt', None)
+                            if not subevent.get('related_to', ''):
+                                subevent.pop('related_to', None)
+                            if not subevent.get('relationship_type', ''):
+                                subevent.pop('relationship_type', None)
+                            subevent.pop('subevents', None)  # Don't need nested subevents
+                    
+                    organized_events.append(event)
             
             # Prepare final result
             result = {
                 'calendar': calendar_info,
-                'events': events,
-                'event_count': len(events)
+                'events': organized_events,
+                'event_count': len(organized_events),
+                'total_events': len(events_by_uid)  # Total including subevents
             }
             
             return {

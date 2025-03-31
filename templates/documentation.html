@@ -42,6 +42,17 @@
                                 structured JSON format. This API fetches iCal data from a specified URL, parses it, and 
                                 returns it in a consistent JSON structure that is easy to work with in any application.
                             </p>
+                            
+                            <div class="alert alert-secondary">
+                                <strong>Quick Links:</strong>
+                                <ul class="mb-0 list-inline">
+                                    <li class="list-inline-item"><a href="#endpoints">API Endpoints</a></li>
+                                    <li class="list-inline-item"><a href="#response-format">Response Format</a></li>
+                                    <li class="list-inline-item"><a href="#subevent-detection">Subevent Detection</a></li>
+                                    <li class="list-inline-item"><a href="#examples">Examples</a></li>
+                                    <li class="list-inline-item"><a href="#limitations">Limitations</a></li>
+                                </ul>
+                            </div>
                         </section>
 
                         <section id="endpoints" class="mb-5">
@@ -118,10 +129,30 @@
       "recurrence": {
         "FREQ": "WEEKLY",
         "BYDAY": ["MO"]
-      }
+      },
+      "subevents": [
+        {
+          "uid": "subevent-456@example.com",
+          "summary": "Sprint Planning",
+          "description": "Planning session for next sprint",
+          "location": "Conference Room A",
+          "status": "CONFIRMED",
+          "start": {
+            "datetime": "2023-05-10T10:00:00-04:00",
+            "value_type": "DATE-TIME",
+            "timezone": "America/New_York"
+          },
+          "end": {
+            "datetime": "2023-05-10T10:30:00-04:00",
+            "value_type": "DATE-TIME",
+            "timezone": "America/New_York"
+          }
+        }
+      ]
     }
   ],
-  "event_count": 1
+  "event_count": 1,
+  "total_events": 2
 }
 </pre>
 
@@ -173,6 +204,39 @@
 
                         <section id="response-format" class="mb-5">
                             <h2>Response Format</h2>
+                            
+                            <h3>Root Response Object</h3>
+                            <table class="table table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Field</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>calendar</td>
+                                        <td>object</td>
+                                        <td>Calendar metadata information</td>
+                                    </tr>
+                                    <tr>
+                                        <td>events</td>
+                                        <td>array</td>
+                                        <td>Array of top-level events (may contain subevents)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>event_count</td>
+                                        <td>integer</td>
+                                        <td>Number of top-level events</td>
+                                    </tr>
+                                    <tr>
+                                        <td>total_events</td>
+                                        <td>integer</td>
+                                        <td>Total number of events including subevents</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                             
                             <h3>Calendar Object</h3>
                             <table class="table table-bordered">
@@ -272,8 +336,56 @@
                                         <td>array</td>
                                         <td>Event reminders/alarms (if applicable)</td>
                                     </tr>
+                                    <tr>
+                                        <td>subevents</td>
+                                        <td>array</td>
+                                        <td>Child events that are contained within this event's timeframe</td>
+                                    </tr>
+                                    <tr>
+                                        <td>related_to</td>
+                                        <td>string</td>
+                                        <td>UID of a related event (if present in the iCal data)</td>
+                                    </tr>
+                                    <tr>
+                                        <td>relationship_type</td>
+                                        <td>string</td>
+                                        <td>Type of relationship to the related event (if specified)</td>
+                                    </tr>
                                 </tbody>
                             </table>
+                        </section>
+
+                        <section id="subevent-detection" class="mb-5">
+                            <h2>Subevent Detection</h2>
+                            <p>
+                                The API automatically identifies and organizes events into a hierarchical structure. 
+                                Events that are contained within other events' timeframes are identified as subevents.
+                                This feature is particularly useful for organizing complex calendar data with umbrella events 
+                                that contain multiple smaller activities.
+                            </p>
+                            
+                            <h3>Detection Methods</h3>
+                            <p>The API detects subevents using several methods (in order of priority):</p>
+                            <ol>
+                                <li>
+                                    <strong>Explicit Relationships:</strong> Events that use the <code>RELATED-TO</code> property to reference another event
+                                </li>
+                                <li>
+                                    <strong>Custom Parent-Child Properties:</strong> Events that use custom properties like <code>PARENT-UID</code> or <code>X-PARENT-UID</code>
+                                </li>
+                                <li>
+                                    <strong>Time Containment:</strong> Events that fall completely within the timeframe of another event are considered subevents
+                                </li>
+                            </ol>
+                            
+                            <div class="alert alert-info">
+                                <h4>Special Case Handling</h4>
+                                <p>
+                                    When two events have exactly the same start and end times, the event with the longer summary/title 
+                                    is considered to be more specific and will not be treated as a subevent. This helps avoid 
+                                    incorrectly categorizing detailed events as subevents of more general ones.
+                                </p>
+                            </div>
                         </section>
 
                         <section id="examples" class="mb-5">
