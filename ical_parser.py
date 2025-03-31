@@ -176,22 +176,48 @@ def fetch_and_parse_ical(url, timeout=10):
                         if uid == other_uid or other_uid in processed_uids:
                             continue
                         
-                        # Check if other event is within this event's time range
-                        if ('start_dt' in other_event and 'end_dt' in other_event and
-                            event['start_dt'] <= other_event['start_dt'] and 
-                            event['end_dt'] >= other_event['end_dt']):
+                        # Skip if either event is missing datetime info
+                        if 'start_dt' not in other_event or 'end_dt' not in other_event:
+                            continue
                             
-                            # If the time ranges match exactly, compare summary/title length
-                            # Longer titles often indicate more specific subevents
-                            if (event['start_dt'] == other_event['start_dt'] and 
-                                event['end_dt'] == other_event['end_dt']):
-                                if len(other_event['summary']) > len(event['summary']):
-                                    # Skip containment for equal time ranges with longer summary
-                                    continue
+                        # Handle type compatibility - convert dates to datetimes if needed
+                        try:
+                            # For comparison, convert date to datetime if needed
+                            event_start = event['start_dt']
+                            event_end = event['end_dt']
+                            other_start = other_event['start_dt']
+                            other_end = other_event['end_dt']
                             
-                            # Add this event as a subevent
-                            event['subevents'].append(other_event)
-                            processed_uids.add(other_uid)
+                            # Convert date objects to datetime objects at midnight
+                            if not isinstance(event_start, datetime):
+                                event_start = datetime.combine(event_start, datetime.min.time())
+                                event_start = event_start.replace(tzinfo=pytz.UTC)
+                            if not isinstance(event_end, datetime):
+                                event_end = datetime.combine(event_end, datetime.min.time())
+                                event_end = event_end.replace(tzinfo=pytz.UTC)
+                            if not isinstance(other_start, datetime):
+                                other_start = datetime.combine(other_start, datetime.min.time())
+                                other_start = other_start.replace(tzinfo=pytz.UTC)
+                            if not isinstance(other_end, datetime):
+                                other_end = datetime.combine(other_end, datetime.min.time())
+                                other_end = other_end.replace(tzinfo=pytz.UTC)
+                            
+                            # Check if other event is within this event's time range
+                            if (event_start <= other_start and event_end >= other_end):
+                                
+                                # If the time ranges match exactly, compare summary/title length
+                                # Longer titles often indicate more specific subevents
+                                if (event_start == other_start and event_end == other_end):
+                                    if len(other_event['summary']) > len(event['summary']):
+                                        # Skip containment for equal time ranges with longer summary
+                                        continue
+                                
+                                # Add this event as a subevent
+                                event['subevents'].append(other_event)
+                                processed_uids.add(other_uid)
+                        except Exception as e:
+                            # Log but continue if there's an error comparing dates
+                            logging.warning(f"Error comparing event dates: {str(e)}")
             
             # Prepare the final event list, keeping only top-level events
             for uid, event in events_by_uid.items():
