@@ -48,6 +48,31 @@ A REST API that fetches iCal feeds from URLs and converts them to a structured J
 
 3. The API will be available at http://localhost:5000
 
+### Using the helper script
+
+For convenience, you can use the included docker-run.sh script:
+
+```bash
+chmod +x docker-run.sh
+./docker-run.sh
+```
+
+## Deployment on Replit
+
+When deploying on Replit:
+
+1. Make sure the application.py file is present (already included in the repository)
+2. Use the following command for deployment:
+   ```
+   gunicorn --bind 0.0.0.0:5000 application:app
+   ```
+
+You can also use the included deploy.sh script:
+```bash
+chmod +x deploy.sh
+./deploy.sh
+```
+
 ## API Usage
 
 ### Converting an iCal feed to JSON

@@ -11,7 +11,7 @@ echo -e "${YELLOW}Building Docker image...${NC}"
 docker build -t ical-to-json-api .
 
 echo -e "${YELLOW}Running Docker container...${NC}"
-docker run -d -p 5000:5000 --name ical-to-json-api ical-to-json-api
+docker run -d -p 5000:5000 --name ical-to-json-api ical-to-json-api gunicorn --bind 0.0.0.0:5000 application:app
 
 echo -e "${GREEN}Container started!${NC}"
 echo -e "The API is available at: ${GREEN}http://localhost:5000${NC}"
