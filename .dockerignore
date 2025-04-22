@@ -48,5 +48,4 @@ replit.nix
 .upm/
 
 # Project specific
-docker-requirements.txt
 README.md
