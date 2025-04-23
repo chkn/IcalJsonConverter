@@ -41,8 +41,21 @@
                         </p>
                         <h2>Quick Start</h2>
                         <div class="code-block">
+                            <h4>Convert to JSON:</h4>
                             <code class="d-block mb-3">GET /api/convert?url=https://example.com/calendar.ics</code>
                             <a href="/api/convert?url=https://calendar.google.com/calendar/ical/en.usa%23holiday%40group.v.calendar.google.com/public/basic.ics" class="btn btn-primary" target="_blank">Try it with US Holidays</a>
+                        </div>
+                        
+                        <div class="code-block mt-4">
+                            <h4>Sync with Glide API:</h4>
+                            <code class="d-block mb-3">POST /api/sync</code>
+                            <pre class="mb-3">
+{
+  "url": "https://example.com/calendar.ics",
+  "bearer_token": "your-glide-api-token"
+}
+</pre>
+                            <a href="/documentation#endpoints" class="btn btn-info">View Detailed Documentation</a>
                         </div>
                         
                         <h2 class="mt-4">Try the API</h2>
@@ -79,6 +92,9 @@
                             <li class="list-group-item">Smart detection of event relationships based on time containment</li>
                             <li class="list-group-item">Error handling for invalid URLs and malformed iCal data</li>
                             <li class="list-group-item">Configurable request timeout</li>
+                            <li class="list-group-item bg-info bg-opacity-25">Sync iCal events directly with Glide API tables</li>
+                            <li class="list-group-item bg-info bg-opacity-25">Intelligent update of existing rows while preserving row IDs</li>
+                            <li class="list-group-item bg-info bg-opacity-25">Add new calendar events to Glide with automatic field mapping</li>
                         </ul>
                         
                         <div class="text-center">
