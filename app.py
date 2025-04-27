@@ -117,22 +117,21 @@ def sync_table_with_etag_handling(api_url, headers, rows_to_update):
             current_rows = response.json().get('data', [])
             logging.debug(f"Received {len(current_rows)} rows from Glide API table {api_url}")
             
-            # Create dictionary of existing rows by UID
-            existing_rows_by_uid = {row.get('uid'): row for row in current_rows if 'uid' in row}
+            # Create a copy of all existing rows to preserve them
+            final_rows_by_uid = {row.get('uid'): row.copy() for row in current_rows if 'uid' in row}
             
-            # Prepare rows for update, preserving existing fields
-            final_rows = []
+            # Update existing rows or add new rows
             for row in rows_to_update:
                 uid = row.get('uid')
-                if uid in existing_rows_by_uid:
-                    # Preserve existing fields by starting with the existing row
-                    existing_row = existing_rows_by_uid[uid].copy()
-                    # Update with new values
-                    existing_row.update(row)
-                    final_rows.append(existing_row)
+                if uid in final_rows_by_uid:
+                    # Update existing row while preserving fields not in the update
+                    final_rows_by_uid[uid].update(row)
                 else:
                     # This is a new row
-                    final_rows.append(row)
+                    final_rows_by_uid[uid] = row
+            
+            # Convert dictionary to list for the API
+            final_rows = list(final_rows_by_uid.values())
             
             # Add If-Match header if we have an ETag
             put_headers = headers.copy()
@@ -242,6 +241,7 @@ def sync_ical_to_glide():
             # Process main trip event
             event_uid = event.get('uid')
             event_name = event.get('summary', '')
+            event_location = event.get('location', '')
             
             # Get start and end times
             start_date = None
@@ -263,6 +263,8 @@ def sync_ical_to_glide():
                 trip_row["startDate"] = start_date
             if end_date:
                 trip_row["endDate"] = end_date
+            if event_location:
+                trip_row["location"] = event_location
                 
             trips_to_update.append(trip_row)
             
