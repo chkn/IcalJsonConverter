@@ -209,6 +209,30 @@
                                     <p><strong>URL:</strong> <code>/api/sync</code></p>
                                     <p><strong>Method:</strong> POST</p>
                                     <p><strong>Content-Type:</strong> application/json</p>
+                                    <p><strong>Authorization:</strong> Bearer token in the header</p>
+                                    
+                                    <h4>Request Headers</h4>
+                                    <table class="table table-bordered">
+                                        <thead>
+                                            <tr>
+                                                <th>Header</th>
+                                                <th>Required</th>
+                                                <th>Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Authorization</td>
+                                                <td>Yes</td>
+                                                <td>Bearer token for Glide API authentication (format: <code>Bearer your-token</code>)</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Content-Type</td>
+                                                <td>Yes</td>
+                                                <td>Must be <code>application/json</code></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                     
                                     <h4>Request Body Parameters</h4>
                                     <table class="table table-bordered">
@@ -228,12 +252,6 @@
                                                 <td>The URL of the iCal feed to sync</td>
                                             </tr>
                                             <tr>
-                                                <td>bearer_token</td>
-                                                <td>string</td>
-                                                <td>Yes</td>
-                                                <td>Bearer token for Glide API authentication</td>
-                                            </tr>
-                                            <tr>
                                                 <td>timeout</td>
                                                 <td>integer</td>
                                                 <td>No</td>
@@ -246,10 +264,10 @@
                                     <pre class="code-block">
 POST /api/sync
 Content-Type: application/json
+Authorization: Bearer your-glide-api-token
 
 {
   "url": "https://example.com/calendar.ics",
-  "bearer_token": "your-glide-api-token",
   "timeout": 15
 }
 </pre>
@@ -288,6 +306,11 @@ Content-Type: application/json
                                                 <td>400 Bad Request</td>
                                                 <td>Malformed iCal data</td>
                                                 <td><pre class="code-block">{"error": "Failed to parse iCal data: Invalid iCal format"}</pre></td>
+                                            </tr>
+                                            <tr>
+                                                <td>401 Unauthorized</td>
+                                                <td>Missing or invalid Authorization header</td>
+                                                <td><pre class="code-block">{"error": "Missing or invalid Authorization header. Must be in format: 'Bearer YOUR_TOKEN'"}</pre></td>
                                             </tr>
                                             <tr>
                                                 <td>500 Internal Server Error</td>

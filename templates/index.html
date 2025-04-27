@@ -50,9 +50,13 @@
                             <h4>Sync with Glide API:</h4>
                             <code class="d-block mb-3">POST /api/sync</code>
                             <pre class="mb-3">
+# Headers
+Authorization: Bearer your-glide-api-token
+Content-Type: application/json
+
+# Request Body
 {
-  "url": "https://example.com/calendar.ics",
-  "bearer_token": "your-glide-api-token"
+  "url": "https://example.com/calendar.ics"
 }
 </pre>
                             <a href="/documentation#endpoints" class="btn btn-info">View Detailed Documentation</a>

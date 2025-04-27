@@ -71,10 +71,17 @@ def sync_ical_to_glide():
     API endpoint to sync iCal events with Glide API
     
     Request parameters:
-    - url: The URL of the iCal feed to sync
-    - bearer_token: Bearer token for Glide API authentication
+    - url: The URL of the iCal feed to sync (in request body)
+    - Authorization: Bearer token in the header for Glide API authentication
     - timeout (optional): Timeout in seconds for the request (default: 10)
     """
+    # Get Authorization header
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return jsonify({"error": "Missing or invalid Authorization header. Must be in format: 'Bearer YOUR_TOKEN'"}), 401
+    
+    bearer_token = auth_header.split(' ')[1]
+    
     # Get request data
     data = request.json
     if not data:
@@ -82,13 +89,10 @@ def sync_ical_to_glide():
         
     # Get required parameters
     url = data.get('url')
-    bearer_token = data.get('bearer_token')
     
     # Validate required parameters
     if not url:
         return jsonify({"error": "Missing required parameter: url"}), 400
-    if not bearer_token:
-        return jsonify({"error": "Missing required parameter: bearer_token"}), 400
     
     # Get optional timeout parameter, default to 10 seconds
     try:
