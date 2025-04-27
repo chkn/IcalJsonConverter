@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import re
 from flask import Flask, jsonify, request, render_template
 from ical_parser import fetch_and_parse_ical, validate_url
 import urllib.parse
@@ -14,8 +15,13 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "fallback-dev-secret")
 
 # Glide API constants
-GLIDE_TABLE_ID = "1fbe5ef8-ceb8-4272-98fa-5c36a79a8eb3"
-GLIDE_API_BASE_URL = f"https://api.glideapps.com/tables/{GLIDE_TABLE_ID}"
+GLIDE_TRIPS_TABLE_ID = "1fbe5ef8-ceb8-4272-98fa-5c36a79a8eb3"
+GLIDE_TRIPS_API_URL = f"https://api.glideapps.com/tables/{GLIDE_TRIPS_TABLE_ID}"
+GLIDE_EVENTS_TABLE_ID = "95fd8fa7-c02b-4cf3-97cd-ca3311f0054e"
+GLIDE_EVENTS_API_URL = f"https://api.glideapps.com/tables/{GLIDE_EVENTS_TABLE_ID}"
+
+# Pattern to extract type from description [Type]
+TYPE_PATTERN = re.compile(r'\[(.*?)\]')
 
 @app.route('/')
 def index():
@@ -64,6 +70,104 @@ def convert_ical_to_json():
     else:
         status_code = result.get('status_code', 500)
         return jsonify({"error": result['message']}), status_code
+
+def extract_type_from_description(description):
+    """
+    Extract type from description field using [Type] pattern
+    
+    Args:
+        description (str): Event description
+        
+    Returns:
+        str: Extracted type or empty string if not found
+    """
+    if not description:
+        return ""
+    
+    match = TYPE_PATTERN.search(description)
+    if match:
+        return match.group(1).strip()
+    return ""
+
+def sync_table_with_etag_handling(api_url, headers, rows_to_update):
+    """
+    Sync data with Glide API table with ETag-based concurrency control
+    
+    Args:
+        api_url (str): Glide API table URL
+        headers (dict): Headers for API requests
+        rows_to_update (list): Rows to update or add
+        
+    Returns:
+        tuple: (success, message, row_count)
+    """
+    max_retries = 3
+    retries = 0
+    
+    while retries < max_retries:
+        try:
+            # Get current data with ETag
+            response = requests.get(f"{api_url}/rows", headers=headers)
+            response.raise_for_status()
+            
+            etag = response.headers.get('ETag')
+            if not etag:
+                logging.warning("No ETag received from Glide API")
+            
+            current_rows = response.json().get('data', [])
+            logging.debug(f"Received {len(current_rows)} rows from Glide API table {api_url}")
+            
+            # Create dictionary of existing rows by UID
+            existing_rows_by_uid = {row.get('uid'): row for row in current_rows if 'uid' in row}
+            
+            # Prepare rows for update, preserving existing fields
+            final_rows = []
+            for row in rows_to_update:
+                uid = row.get('uid')
+                if uid in existing_rows_by_uid:
+                    # Preserve existing fields by starting with the existing row
+                    existing_row = existing_rows_by_uid[uid].copy()
+                    # Update with new values
+                    existing_row.update(row)
+                    final_rows.append(existing_row)
+                else:
+                    # This is a new row
+                    final_rows.append(row)
+            
+            # Add If-Match header if we have an ETag
+            put_headers = headers.copy()
+            if etag:
+                put_headers['If-Match'] = etag
+            
+            # Update table
+            update_payload = {"rows": final_rows}
+            put_response = requests.put(api_url, headers=put_headers, json=update_payload)
+            
+            # If we get a 412 (Precondition Failed), retry the operation
+            if put_response.status_code == 412:
+                logging.warning("Optimistic concurrency conflict detected, retrying...")
+                retries += 1
+                continue
+            
+            # For other status codes, raise exception
+            put_response.raise_for_status()
+            
+            return True, f"Successfully synced {len(final_rows)} rows", len(final_rows)
+            
+        except requests.RequestException as e:
+            # Only retry on optimistic concurrency conflicts
+            response = getattr(e, 'response', None)
+            status_code = None
+            if response is not None:
+                status_code = getattr(response, 'status_code', None)
+            
+            if retries >= max_retries - 1 or status_code != 412:
+                logging.error(f"API request error: {str(e)}")
+                return False, f"Error communicating with Glide API: {str(e)}", 0
+            
+            retries += 1
+    
+    return False, "Maximum retries exceeded for optimistic concurrency control", 0
 
 @app.route('/api/sync', methods=['POST'])
 def sync_ical_to_glide():
@@ -122,30 +226,23 @@ def sync_ical_to_glide():
             "Content-Type": "application/json"
         }
         
-        # Step 1: Fetch current rows from Glide API
-        logging.debug(f"Fetching rows from Glide API: {GLIDE_API_BASE_URL}/rows")
-        response = requests.get(f"{GLIDE_API_BASE_URL}/rows", headers=headers)
-        response.raise_for_status()
+        # Process top-level events (trips)
+        trips_to_update = []
+        events_to_update = []
         
-        current_rows = response.json().get('data', [])
-        logging.debug(f"Received {len(current_rows)} rows from Glide API")
+        # Organize events by trip and subevents
+        events_data = ical_result['data']['events']
+        logging.debug(f"Processing {len(events_data)} events from iCal")
         
-        # Create a dictionary of existing rows by UID for easier lookup
-        existing_rows_by_uid = {row.get('uid'): row for row in current_rows if 'uid' in row}
-        
-        # Step 2: Convert iCal events to Glide row format
-        events = ical_result['data']['events']
-        logging.debug(f"Processing {len(events)} events from iCal")
-        
-        new_rows = []
-        for event in events:
+        for event in events_data:
             # Skip events without UIDs
             if not event.get('uid'):
                 continue
                 
-            # Extract required fields for Glide
+            # Process main trip event
             event_uid = event.get('uid')
             event_name = event.get('summary', '')
+            event_location = event.get('location', '')
             
             # Get start and end times
             start_date = None
@@ -157,48 +254,92 @@ def sync_ical_to_glide():
             if 'end' in event and 'datetime' in event['end']:
                 end_date = event['end']['datetime']
             
-            # If this event already exists in Glide, keep the row ID and update fields
-            if event_uid in existing_rows_by_uid:
-                existing_row = existing_rows_by_uid[event_uid]
-                row = {
-                    "$rowID": existing_row.get("$rowID"),
-                    "uid": event_uid,
-                    "name": event_name
-                }
-                if start_date:
-                    row["startDate"] = start_date
-                if end_date:
-                    row["endDate"] = end_date
+            # Create trip row
+            trip_row = {
+                "uid": event_uid,
+                "name": event_name
+            }
+            
+            if start_date:
+                trip_row["startDate"] = start_date
+            if end_date:
+                trip_row["endDate"] = end_date
+            if event_location:
+                trip_row["location"] = event_location
+                
+            trips_to_update.append(trip_row)
+            
+            # Process subevents
+            if 'subevents' in event and event['subevents']:
+                for subevent in event['subevents']:
+                    if not subevent.get('uid'):
+                        continue
+                        
+                    subevent_uid = subevent.get('uid')
+                    subevent_summary = subevent.get('summary', '')
+                    subevent_description = subevent.get('description', '')
+                    subevent_location = subevent.get('location', '')
                     
-                new_rows.append(row)
-                # Remove from dictionary to track which events were processed
-                existing_rows_by_uid.pop(event_uid)
-            else:
-                # This is a new event
-                row = {
-                    "uid": event_uid,
-                    "name": event_name
-                }
-                if start_date:
-                    row["startDate"] = start_date
-                if end_date:
-                    row["endDate"] = end_date
+                    # Extract event type from description [Type]
+                    event_type = extract_type_from_description(subevent_description)
                     
-                new_rows.append(row)
+                    # Get start and end times
+                    subevent_start = None
+                    subevent_end = None
+                    
+                    if 'start' in subevent and 'datetime' in subevent['start']:
+                        subevent_start = subevent['start']['datetime']
+                    
+                    if 'end' in subevent and 'datetime' in subevent['end']:
+                        subevent_end = subevent['end']['datetime']
+                    
+                    # Create event row
+                    event_row = {
+                        "uid": subevent_uid,
+                        "tripUID": event_uid,
+                        "summary": subevent_summary
+                    }
+                    
+                    if event_type:
+                        event_row["type"] = event_type
+                    if subevent_location:
+                        event_row["location"] = subevent_location
+                    if subevent_start:
+                        event_row["startDate"] = subevent_start
+                    if subevent_end:
+                        event_row["endDate"] = subevent_end
+                        
+                    events_to_update.append(event_row)
         
-        # Step 3: Call Glide API to update the table
-        update_payload = {"rows": new_rows}
-        logging.debug(f"Updating Glide API with {len(new_rows)} rows")
+        # Sync trips table
+        trips_success, trips_message, trips_count = sync_table_with_etag_handling(
+            GLIDE_TRIPS_API_URL, headers, trips_to_update
+        )
         
-        put_response = requests.put(GLIDE_API_BASE_URL, headers=headers, json=update_payload)
-        put_response.raise_for_status()
+        # Sync events table
+        events_success, events_message, events_count = sync_table_with_etag_handling(
+            GLIDE_EVENTS_API_URL, headers, events_to_update
+        )
         
-        return jsonify({
-            "success": True,
-            "message": f"Successfully synced {len(new_rows)} events",
-            "synced_event_count": len(new_rows),
-            "removed_event_count": len(existing_rows_by_uid)
-        })
+        # Prepare response
+        response_data = {
+            "success": trips_success and events_success,
+            "trips": {
+                "success": trips_success,
+                "message": trips_message,
+                "synced_count": trips_count
+            },
+            "events": {
+                "success": events_success,
+                "message": events_message,
+                "synced_count": events_count
+            }
+        }
+        
+        if not response_data["success"]:
+            return jsonify(response_data), 500
+            
+        return jsonify(response_data)
         
     except requests.RequestException as e:
         logging.error(f"Glide API request error: {str(e)}")
