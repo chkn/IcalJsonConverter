@@ -268,6 +268,7 @@ def sync_ical_to_glide():
             # Process main trip event
             event_uid = event.get('uid')
             event_name = event.get('summary', '')
+            event_location = event.get('location', '')
 
             # Get start and end times
             start_date = None
@@ -280,7 +281,11 @@ def sync_ical_to_glide():
                 end_date = event['end']['datetime']
 
             # Create trip row
-            trip_row = {"uid": event_uid, "name": event_name}
+            trip_row = {
+                "uid": event_uid,
+                "name": event_name,
+                "ZS0Be": event_location
+            }
 
             if start_date:
                 trip_row["startDate"] = start_date
